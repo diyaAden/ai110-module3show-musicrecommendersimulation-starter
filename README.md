@@ -179,11 +179,31 @@ Use this section to document the experiments you ran. For example:
 
 Summarize some limitations of your recommender.
 
-Examples:
+**General limitations**
 
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
+- It only works on a tiny catalog (18 songs), so rankings are noisy.
+- It does not understand lyrics or language — only the numeric/categorical features.
+- Genre is weighted highest (`+2.0`), so it can over-favor one genre.
+- Exact-match categoricals can't recognize *adjacent* tastes (ambient is treated as
+  no more "lofi-like" than metal is).
+
+**Edge cases found by adversarial testing**
+
+I tried to "trick" the scoring logic with deliberately awkward profiles
+(see `tests/test_adversarial.py`). Two exposed real bugs, now fixed:
+
+| Profile | Problem | Status |
+|---|---|---|
+| `target_energy: 5.0` (out of range) | Energy term went strongly **negative**, poisoning the ranking | ✅ Fixed — target is clamped to `[0, 1]` |
+| `genre: "Pop"` (wrong case) | Silently failed to match `"pop"`, so the user's main preference was ignored | ✅ Fixed — matching is now case-insensitive |
+
+Remaining behaviors that are *by design* but worth knowing:
+
+- **Conflicting preferences** (e.g. `mood: chill` + `target_energy: 0.9`) are resolved
+  by letting the categorical match win, so a "high-energy" seeker can still be handed
+  a calm song.
+- **Empty profile** (`{}`) scores every song `0.0` and returns them in catalog order —
+  the "recommendations" are then just the first rows of the file.
 
 You will go deeper on this in your model card.
 

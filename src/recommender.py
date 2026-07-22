@@ -10,6 +10,16 @@ MOOD_WEIGHT = 1.0
 ENERGY_WEIGHT = 1.0
 ACOUSTIC_WEIGHT = 1.0
 
+
+def _clamp01(value: float) -> float:
+    """Clamp a number into the [0.0, 1.0] range."""
+    return max(0.0, min(1.0, value))
+
+
+def _same(a: str, b: str) -> bool:
+    """Case- and whitespace-insensitive text match."""
+    return str(a).strip().lower() == str(b).strip().lower()
+
 @dataclass
 class Song:
     """
@@ -111,22 +121,25 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     score = 0.0
     reasons: List[str] = []
 
-    # Rule 1 — genre match (strongest signal, highest weight)
-    if genre_pref is not None and song["genre"] == genre_pref:
+    # Rule 1 — genre match (strongest signal, highest weight).
+    # Case-insensitive so "Pop" still matches "pop".
+    if genre_pref is not None and _same(song["genre"], genre_pref):
         score += GENRE_WEIGHT
         reasons.append(f"matches your favorite genre ({song['genre']})")
 
-    # Rule 2 — mood match
-    if mood_pref is not None and song["mood"] == mood_pref:
+    # Rule 2 — mood match (also case-insensitive)
+    if mood_pref is not None and _same(song["mood"], mood_pref):
         score += MOOD_WEIGHT
         reasons.append(f"matches your mood ({song['mood']})")
 
-    # Rule 3 — energy proximity (closeness to target, not raw value)
+    # Rule 3 — energy proximity (closeness to target, not raw value).
+    # Clamp the target to [0, 1] so out-of-range input can't push the score negative.
     if energy_pref is not None:
-        closeness = 1 - abs(song["energy"] - energy_pref)
+        target = _clamp01(float(energy_pref))
+        closeness = 1 - abs(song["energy"] - target)
         score += ENERGY_WEIGHT * closeness
         reasons.append(
-            f"energy {song['energy']:.2f} is close to your target {energy_pref:.2f}"
+            f"energy {song['energy']:.2f} is close to your target {target:.2f}"
         )
 
     # Rule 4 — acoustic preference lever
